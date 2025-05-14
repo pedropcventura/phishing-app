@@ -1,6 +1,21 @@
-from flask import Flask
-app = Flask(__name__)
+from flask import Flask, request, jsonify
+from phishing import normalize_url, extract_features
+from flask_cors import CORS
 
-@app.route("/api/python")
-def hello_world():
-    return "<p>Hello, World!</p>"
+app = Flask(__name__)
+CORS(app)
+
+@app.route("/api/analyze", methods=['POST'])
+def analyze():
+    body = request.get_json(force=True)
+    url_raw = body.get('url')
+    if not url_raw:
+        return jsonify({'error': 'URL é obrigatória'}), 400
+    
+    url = normalize_url(url_raw)
+    features = extract_features(url)
+    return jsonify({'url': url, 'features': features})
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=10000, debug=True)

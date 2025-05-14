@@ -1,0 +1,10 @@
+Flask
+flask-cors
+requests
+beautifulsoup4
+python-whois
+python-Levenshtein
+transformers
+torch
+geoip2
+joblib
