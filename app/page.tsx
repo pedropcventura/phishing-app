@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { analyzeUrl } from "./lib/api"
-import { Shield, AlertTriangle, CheckCircle, Loader2, AlertCircle, Info } from "lucide-react"
+import { Shield, AlertTriangle, CheckCircle, Loader2, AlertCircle, Info, Clock, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,34 +43,93 @@ type ApiResponse = {
   url: string
 }
 
+type HistoryItem = {
+  url: string
+  timestamp: number
+  riskLevel: string
+  riskScore: number
+}
+
 export default function PhishingAnalyzer() {
   const [url, setUrl] = useState("")
   const [results, setResults] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [searchHistory, setSearchHistory] = useState<HistoryItem[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+
+  // Load search history from localStorage on component mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("phishing-analyzer-history")
+    if (savedHistory) {
+      try {
+        setSearchHistory(JSON.parse(savedHistory))
+      } catch (e) {
+        console.error("Failed to parse search history", e)
+      }
+    }
+  }, [])
+
+  // Save search history to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("phishing-analyzer-history", JSON.stringify(searchHistory))
+  }, [searchHistory])
+
+  const addToHistory = (analysisResults: ApiResponse) => {
+    const cleanUrl = analysisResults.url.replace(/^https?:\/\//, "").replace(/\/$/, "")
+
+    // Create history item
+    const historyItem: HistoryItem = {
+      url: cleanUrl,
+      timestamp: Date.now(),
+      riskLevel: analysisResults.features.risk_level,
+      riskScore: analysisResults.features.risk_score,
+    }
+
+    // Add to history, avoiding duplicates (replace if exists)
+    setSearchHistory((prev) => {
+      const filtered = prev.filter((item) => item.url !== cleanUrl)
+      return [historyItem, ...filtered].slice(0, 10) // Keep only the 10 most recent
+    })
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    await analyzeUrlAndUpdateUI(url)
+  }
 
+  const analyzeUrlAndUpdateUI = async (urlToAnalyze: string) => {
     // Basic URL validation
-    if (!url.trim() || !url.match(/^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w- ./?%&=]*)?$/)) {
+    if (!urlToAnalyze.trim() || !urlToAnalyze.match(/^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w- ./?%&=]*)?$/)) {
       setError("Please enter a valid URL")
       return
     }
 
     setLoading(true)
     setError("")
+    setUrl(urlToAnalyze) // Update the input field
 
     try {
-      const cleanUrl = url.replace(/^https?:\/\//, "")
+      const cleanUrl = urlToAnalyze.replace(/^https?:\/\//, "")
       const analysisResults = await analyzeUrl(cleanUrl)
       setResults(analysisResults as ApiResponse)
+      addToHistory(analysisResults as ApiResponse)
     } catch (err) {
       setError("Failed to analyze URL. Please try again.")
       console.error(err)
     } finally {
       setLoading(false)
     }
+  }
+
+  const clearHistory = () => {
+    setSearchHistory([])
+    localStorage.removeItem("phishing-analyzer-history")
+  }
+
+  const removeHistoryItem = (urlToRemove: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent triggering the parent click handler
+    setSearchHistory((prev) => prev.filter((item) => item.url !== urlToRemove))
   }
 
   const getRiskBadge = (riskLevel: string) => {
@@ -102,6 +161,10 @@ export default function PhishingAnalyzer() {
     return "bg-red-500"
   }
 
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString()
+  }
+
   return (
     <main className="container mx-auto px-4 py-10 max-w-4xl">
       <div className="flex flex-col items-center text-center mb-8">
@@ -110,41 +173,99 @@ export default function PhishingAnalyzer() {
         <p className="text-muted-foreground max-w-md">Enter a URL to analyze and detect potential phishing threats</p>
       </div>
 
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Analyze URL</CardTitle>
-          <CardDescription>Enter the URL you want to check for phishing indicators</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-            <Input
-              type="text"
-              placeholder="facebook.com or google.com"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="flex-1"
-            />
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing
-                </>
-              ) : (
-                "Analyze"
-              )}
-            </Button>
-          </form>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Analyze URL</CardTitle>
+            <CardDescription>Enter the URL you want to check for phishing indicators</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
+              <Input
+                type="text"
+                placeholder="facebook.com or google.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="flex-1"
+              />
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing
+                  </>
+                ) : (
+                  "Analyze"
+                )}
+              </Button>
+            </form>
 
-          {error && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+            {error && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Search History</CardTitle>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setShowHistory(!showHistory)}>
+              <Clock className="h-4 w-4" />
+              <span className="sr-only">Toggle history</span>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {searchHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No search history yet</p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mb-3">
+                  {showHistory ? `${searchHistory.length} recent searches` : "Click to show history"}
+                </p>
+
+                {showHistory && (
+                  <>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                      {searchHistory.map((item) => (
+                        <div
+                          key={item.url + item.timestamp}
+                          className="flex items-center justify-between p-2 rounded-md bg-secondary/50 hover:bg-secondary cursor-pointer"
+                          onClick={() => analyzeUrlAndUpdateUI(item.url)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{item.url}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(item.timestamp)}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {getRiskBadge(item.riskLevel)}
+                            <button
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={(e) => removeHistoryItem(item.url, e)}
+                            >
+                              <X className="h-4 w-4" />
+                              <span className="sr-only">Remove</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 flex justify-end">
+                      <Button variant="outline" size="sm" onClick={clearHistory}>
+                        Clear History
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {results && (
         <Card>
