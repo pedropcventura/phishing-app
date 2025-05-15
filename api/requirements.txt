@@ -8,3 +8,5 @@ transformers
 torch
 geoip2
 joblib
+pandas
+scikit-learn
