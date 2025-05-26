@@ -1,6 +1,6 @@
 // lib/api.ts
 export async function analyzeUrl(url: string) {
-    const res = await fetch("https://bountiful-mindfulness-production.up.railway.app/", {
+    const res = await fetch("http://localhost:10000/api/analyze", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),

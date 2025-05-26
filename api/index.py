@@ -7,6 +7,7 @@ CORS(app)
 
 @app.route("/api/analyze", methods=['POST'])
 def analyze():
+    print("base")
     body = request.get_json(force=True)
     url_raw = body.get('url')
     if not url_raw:

@@ -172,8 +172,9 @@ def detect_phishing_hf(url: str) -> dict:
     out = hf_phish_clf(url)[0]
     # Exemplo de `out`: {'label': 'LABEL_1', 'score': 0.87}
     label = out["label"]
+    print(label)
     # No modelo em questão, LABEL_1 = phishing, LABEL_0 = legitimate
-    is_phish = 1 if label.endswith("1") else 0
+    is_phish = 1 if (label == "phishing") else 0
     return {"hf_phishing": is_phish, "hf_confidence": out["score"]}
 
 
@@ -324,6 +325,7 @@ def risk_level(score: int) -> str:
 
 # ---------- Extração de features para ML ----------
 def extract_features(url: str) -> dict:
+    print("===========================================")
     f = {}
     f.update(analyze_basic_heuristics(url))
     f.update(analyze_domain_age(url))

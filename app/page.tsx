@@ -4,14 +4,13 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { analyzeUrl } from "./lib/api"
-import { Shield, AlertTriangle, CheckCircle, Loader2, AlertCircle, Info, Clock, X } from "lucide-react"
+import { Shield, AlertTriangle, Loader2, Clock, X, Database, Globe, Lock, Eye, Activity, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type ApiResponse = {
@@ -110,8 +109,7 @@ export default function PhishingAnalyzer() {
     setUrl(urlToAnalyze) // Update the input field
 
     try {
-      const cleanUrl = urlToAnalyze.replace(/^https?:\/\//, "")
-      const analysisResults = await analyzeUrl(cleanUrl)
+      const analysisResults = await analyzeUrl(urlToAnalyze)
       setResults(analysisResults as ApiResponse)
       addToHistory(analysisResults as ApiResponse)
     } catch (err) {
@@ -165,8 +163,29 @@ export default function PhishingAnalyzer() {
     return new Date(timestamp).toLocaleString()
   }
 
+  const getBooleanBadge = (value: number, trueText: string, falseText: string) => {
+    return value === 1 ? (
+      <Badge variant="destructive">{trueText}</Badge>
+    ) : (
+      <Badge variant="secondary">{falseText}</Badge>
+    )
+  }
+
+  const getFeatureCard = (title: string, value: string | number, description: string, icon: React.ReactNode) => (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  )
+
   return (
-    <main className="container mx-auto px-4 py-10 max-w-4xl">
+    <main className="container mx-auto px-4 py-10 max-w-6xl">
       <div className="flex flex-col items-center text-center mb-8">
         <Shield className="h-12 w-12 mb-4 text-primary" />
         <h1 className="text-3xl font-bold tracking-tight mb-2">Phishing URL Analyzer</h1>
@@ -183,7 +202,7 @@ export default function PhishingAnalyzer() {
             <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
               <Input
                 type="text"
-                placeholder="facebook.com or google.com"
+                placeholder="insper.edu.br or facebook.com"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 className="flex-1"
@@ -268,281 +287,279 @@ export default function PhishingAnalyzer() {
       </div>
 
       {results && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              Analysis Results
-              {getRiskBadge(results.features.risk_level)}
-            </CardTitle>
-            <CardDescription>
-              Analysis for: <span className="font-medium">{results.url}</span>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="summary" className="mt-2">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="summary">Summary</TabsTrigger>
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="factors">Risk Factors</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="summary" className="space-y-6 pt-4">
-                <div>
+        <div className="space-y-6">
+          {/* Main Results Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                Analysis Results
+                {getRiskBadge(results.features.risk_level)}
+              </CardTitle>
+              <CardDescription>
+                Analysis for: <span className="font-medium">{results.url}</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="md:col-span-2">
                   <h3 className="text-lg font-medium mb-2">Risk Score</h3>
                   <div className="flex items-center gap-4">
                     <div className="w-full flex-1">
-                      <Progress value={results.features.risk_score} className="h-4">
+                      <Progress value={results.features.risk_score} className="h-6">
                         <div
-                          className={`h-full ${getScoreColor(results.features.risk_score)}`}
+                          className={`h-full ${getScoreColor(results.features.risk_score)} transition-all duration-500`}
                           style={{ width: `${results.features.risk_score}%` }}
                         ></div>
                       </Progress>
                     </div>
-                    <span className="text-xl font-semibold whitespace-nowrap">{results.features.risk_score}/100</span>
+                    <span className="text-2xl font-bold whitespace-nowrap">{results.features.risk_score}/100</span>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
                     Higher score means the URL is more likely to be legitimate.
                   </p>
                 </div>
 
-                <Separator />
+                <div>
+                  <h3 className="text-lg font-medium mb-2">ML Confidence</h3>
+                  <div className="text-3xl font-bold">{(results.features.hf_confidence * 100).toFixed(2)}%</div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-lg font-medium mb-3">Negative Factors</h3>
-                    {results.features.explanation.negative_factors.length > 0 ? (
-                      <ul className="space-y-2">
-                        {results.features.explanation.negative_factors.map((factor, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
-                            <span>{factor}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">No negative factors detected.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Detailed Analysis Tabs */}
+          <Card>
+            <CardContent className="pt-6">
+              <Tabs defaultValue="features" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="features">All Features</TabsTrigger>
+                  <TabsTrigger value="security">Security</TabsTrigger>
+                  <TabsTrigger value="patterns">Patterns</TabsTrigger>
+                  <TabsTrigger value="raw">Raw Data</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="features" className="pt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {getFeatureCard(
+                      "Domain Age",
+                      `${results.features.domain_age_days} days`,
+                      results.features.domain_age_days > 365 ? "Established domain" : "Recently registered",
+                      <Globe className="h-4 w-4 text-muted-foreground" />,
+                    )}
+
+                    {getFeatureCard(
+                      "SSL Certificate",
+                      `${results.features.ssl_valid_days} days`,
+                      results.features.ssl_valid_days > 0 ? "Valid certificate" : "Invalid or missing",
+                      <Lock className="h-4 w-4 text-muted-foreground" />,
+                    )}
+
+                    {getFeatureCard(
+                      "URL Length",
+                      `${results.features.url_length} chars`,
+                      "Total character count",
+                      <Eye className="h-4 w-4 text-muted-foreground" />,
+                    )}
+
+                    {getFeatureCard(
+                      "Country",
+                      results.features.country || "Unknown",
+                      "Server location",
+                      <Globe className="h-4 w-4 text-muted-foreground" />,
+                    )}
+
+                    {getFeatureCard(
+                      "Min Levenshtein",
+                      results.features.min_levenshtein.toString(),
+                      "Distance to known domains",
+                      <Activity className="h-4 w-4 text-muted-foreground" />,
+                    )}
+
+                    {getFeatureCard(
+                      "HF Confidence",
+                      `${(results.features.hf_confidence * 100).toFixed(4)}%`,
+                      "Machine learning confidence",
+                      <Zap className="h-4 w-4 text-muted-foreground" />,
+                    )}
+
+                    {getFeatureCard(
+                      "HF Phishing",
+                      results.features.hf_phishing === 1 ? "PHISHING" : "LEGITIMATE",
+                      "ML classification result",
+                      <Database className="h-4 w-4 text-muted-foreground" />,
+                    )}
+
+                    {getFeatureCard(
+                      "Risk Level",
+                      results.features.risk_level,
+                      "Overall risk assessment",
+                      <Shield className="h-4 w-4 text-muted-foreground" />,
                     )}
                   </div>
+                </TabsContent>
 
-                  <div>
-                    <h3 className="text-lg font-medium mb-3">Positive Factors</h3>
-                    {results.features.explanation.positive_factors.length > 0 ? (
-                      <ul className="space-y-2">
-                        {results.features.explanation.positive_factors.map((factor, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
-                            <span>{factor}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">No positive factors detected.</p>
-                    )}
+                <TabsContent value="security" className="pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Bad IP Address</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(results.features.bad_ip, "Malicious IP", "Clean IP")}
+                        <p className="text-xs text-muted-foreground mt-2">IP address reputation check</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Dynamic DNS</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(results.features.dynamic_dns, "Dynamic DNS", "Static DNS")}
+                        <p className="text-xs text-muted-foreground mt-2">DNS configuration type</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">In Phishing Database</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(results.features.phish_in_database, "Known Phishing", "Not in Database")}
+                        <p className="text-xs text-muted-foreground mt-2">Previously reported as phishing</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Phishing Valid</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(results.features.phish_valid, "Valid Phishing", "Not Valid Phishing")}
+                        <p className="text-xs text-muted-foreground mt-2">Validated phishing status</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">SSL Certificate</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{results.features.ssl_valid_days}</div>
+                        <p className="text-xs text-muted-foreground">Days until SSL expiration</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Country Code</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{results.features.country || "UNK"}</div>
+                        <p className="text-xs text-muted-foreground">Server location identifier</p>
+                      </CardContent>
+                    </Card>
                   </div>
-                </div>
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="details" className="pt-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <Card>
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-sm font-medium">Domain Age</CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-2">
-                      <p className="text-2xl font-semibold">{results.features.domain_age_days} days</p>
-                      <p className="text-xs text-muted-foreground">
-                        {results.features.domain_age_days > 365 ? "Established domain" : "Recently registered"}
-                      </p>
-                    </CardContent>
-                  </Card>
+                <TabsContent value="patterns" className="pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Login Form</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(results.features.login_form, "Login Form Present", "No Login Form")}
+                        <p className="text-xs text-muted-foreground mt-2">Presence of authentication forms</p>
+                      </CardContent>
+                    </Card>
 
-                  <Card>
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-sm font-medium">SSL Certificate</CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-2">
-                      <p className="text-2xl font-semibold">{results.features.ssl_valid_days} days</p>
-                      <p className="text-xs text-muted-foreground">
-                        {results.features.ssl_valid_days > 0 ? "Valid certificate" : "Invalid or missing"}
-                      </p>
-                    </CardContent>
-                  </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">OAuth Suspicious</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(results.features.oauth_suspicious, "Suspicious OAuth", "Normal OAuth")}
+                        <p className="text-xs text-muted-foreground mt-2">OAuth implementation analysis</p>
+                      </CardContent>
+                    </Card>
 
-                  <Card>
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-sm font-medium">ML Confidence</CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-2">
-                      <p className="text-2xl font-semibold">{(results.features.hf_confidence * 100).toFixed(2)}%</p>
-                      <p className="text-xs text-muted-foreground">
-                        {results.features.hf_phishing === 0 ? "Legitimate URL" : "Potential phishing"}
-                      </p>
-                    </CardContent>
-                  </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Redirect Suspicious</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(
+                          results.features.redirect_suspicious,
+                          "Suspicious Redirects",
+                          "Normal Redirects",
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">Redirection pattern analysis</p>
+                      </CardContent>
+                    </Card>
 
-                  <Card>
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-sm font-medium">URL Properties</CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-2">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>Length:</div>
-                        <div className="font-medium">{results.features.url_length} chars</div>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Special Characters</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(
+                          results.features.special_characters,
+                          "Special Chars Present",
+                          "No Special Chars",
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">Unusual character usage</p>
+                      </CardContent>
+                    </Card>
 
-                        <div>Special Chars:</div>
-                        <div className="font-medium">{results.features.special_characters ? "Yes" : "No"}</div>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Digit Substitution</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(
+                          results.features.digit_substitution,
+                          "Digit Substitution",
+                          "No Digit Substitution",
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">Numbers replacing letters</p>
+                      </CardContent>
+                    </Card>
 
-                        <div>Digit Subst.:</div>
-                        <div className="font-medium">{results.features.digit_substitution ? "Yes" : "No"}</div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-sm font-medium">Suspicious Patterns</CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-2">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>Redirects:</div>
-                        <div className="font-medium">
-                          {results.features.redirect_suspicious ? "Suspicious" : "Normal"}
-                        </div>
-
-                        <div>Login Form:</div>
-                        <div className="font-medium">{results.features.login_form ? "Present" : "None"}</div>
-
-                        <div>OAuth:</div>
-                        <div className="font-medium">{results.features.oauth_suspicious ? "Suspicious" : "Normal"}</div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-sm font-medium">Known Risks</CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-2">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>In Database:</div>
-                        <div className="font-medium">{results.features.phish_in_database ? "Yes" : "No"}</div>
-
-                        <div>Bad IP:</div>
-                        <div className="font-medium">{results.features.bad_ip ? "Yes" : "No"}</div>
-
-                        <div>Country:</div>
-                        <div className="font-medium">{results.features.country}</div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="factors" className="pt-4">
-                <Alert className="mb-6">
-                  <Info className="h-4 w-4" />
-                  <AlertTitle>Risk Assessment</AlertTitle>
-                  <AlertDescription>
-                    This analysis combines machine learning models with rules-based detection to identify phishing
-                    attempts.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-medium mb-2">Key Risk Indicators</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="flex items-center p-3 rounded-md bg-secondary/50">
-                        <div
-                          className={`w-3 h-3 rounded-full ${results.features.domain_age_days < 30 ? "bg-red-500" : "bg-green-500"} mr-3`}
-                        ></div>
-                        <div>
-                          <p className="font-medium">Domain Age</p>
-                          <p className="text-sm text-muted-foreground">
-                            Phishing sites often use newly registered domains
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center p-3 rounded-md bg-secondary/50">
-                        <div
-                          className={`w-3 h-3 rounded-full ${results.features.ssl_valid_days === 0 ? "bg-red-500" : "bg-green-500"} mr-3`}
-                        ></div>
-                        <div>
-                          <p className="font-medium">SSL Certificate</p>
-                          <p className="text-sm text-muted-foreground">
-                            Legitimate sites typically have valid SSL certificates
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center p-3 rounded-md bg-secondary/50">
-                        <div
-                          className={`w-3 h-3 rounded-full ${results.features.login_form && results.features.domain_age_days < 180 ? "bg-red-500" : "bg-green-500"} mr-3`}
-                        ></div>
-                        <div>
-                          <p className="font-medium">Login Form</p>
-                          <p className="text-sm text-muted-foreground">
-                            Login forms on new domains are common in phishing
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center p-3 rounded-md bg-secondary/50">
-                        <div
-                          className={`w-3 h-3 rounded-full ${results.features.redirect_suspicious ? "bg-red-500" : "bg-green-500"} mr-3`}
-                        ></div>
-                        <div>
-                          <p className="font-medium">Redirections</p>
-                          <p className="text-sm text-muted-foreground">
-                            Suspicious redirects may indicate phishing attempts
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center p-3 rounded-md bg-secondary/50">
-                        <div
-                          className={`w-3 h-3 rounded-full ${results.features.phish_in_database ? "bg-red-500" : "bg-green-500"} mr-3`}
-                        ></div>
-                        <div>
-                          <p className="font-medium">Known Phishing</p>
-                          <p className="text-sm text-muted-foreground">URL has been previously reported as phishing</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center p-3 rounded-md bg-secondary/50">
-                        <div
-                          className={`w-3 h-3 rounded-full ${results.features.hf_phishing ? "bg-red-500" : "bg-green-500"} mr-3`}
-                        ></div>
-                        <div>
-                          <p className="font-medium">ML Detection</p>
-                          <p className="text-sm text-muted-foreground">Machine learning model classification result</p>
-                        </div>
-                      </div>
-                    </div>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Excessive Subdomains</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {getBooleanBadge(
+                          results.features.excessive_subdomains,
+                          "Too Many Subdomains",
+                          "Normal Subdomains",
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">Subdomain structure analysis</p>
+                      </CardContent>
+                    </Card>
                   </div>
+                </TabsContent>
 
-                  <div>
-                    <h3 className="text-lg font-medium mb-2">Safety Recommendations</h3>
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li className="text-muted-foreground">
-                        Always verify the domain name before entering credentials
-                      </li>
-                      <li className="text-muted-foreground">Check for HTTPS and a valid SSL certificate</li>
-                      <li className="text-muted-foreground">Be cautious of URLs sent via email or messages</li>
-                      <li className="text-muted-foreground">
-                        When in doubt, go directly to the service's website by typing the URL
-                      </li>
-                      <li className="text-muted-foreground">
-                        Use a password manager that will only fill credentials on legitimate sites
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                <TabsContent value="raw" className="pt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Complete API Response</CardTitle>
+                      <CardDescription>Raw JSON data from the analysis API</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <pre className="bg-secondary p-4 rounded-md overflow-auto text-sm">
+                        {JSON.stringify(results, null, 2)}
+                      </pre>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </main>
   )
